@@ -1,4 +1,4 @@
-import { parentPort, workerData } from "worker_threads";
+import { workerData } from "worker_threads";
 import { htmlProcesser, getHtmlPage, extractLinks, PuppeteerRequiredError } from "./processer.js";
 import puppeteer from 'puppeteer';
 import { config } from '../../config/index.js';

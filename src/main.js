@@ -117,7 +117,7 @@ async function main() {
 
   try {
     // تشغيل متصفح واحد فقط في العملية الرئيسية
-    browser = await puppeteer.launch({ headless: 'new' });
+    browser = await puppeteer.launch({ headless: true });
     const browserWSEndpoint = browser.wsEndpoint();
 
     // --- الاقتراح: تشغيل عامل واحد لـ Puppeteer والبقية لـ Fetch ---
@@ -127,10 +127,10 @@ async function main() {
       workerData: { type: 'puppeteer', browserWSEndpoint } 
     });
     puppeteerWorker.on("message", msg => {
-      if (msg.type === 'error') {
+      if (typeof msg === 'object' && msg !== null && msg.type === 'error' && msg.message) {
         fileErrorLog(`[PuppeteerWorker]: ${msg.message}`);
       } else {
-        fileLog(`[PuppeteerWorker]: ${msg.message}`);
+        fileLog(`[PuppeteerWorker]: ${msg}`);
       }
     });
     puppeteerWorker.on("error", err => fileErrorLog(`[PuppeteerWorker Unhandled Error]: ${err.stack}`));
@@ -141,10 +141,10 @@ async function main() {
     Array.from({ length: fetchWorkerCount }, (_, idx) => {
       const worker = new Worker(workerURL, { workerData: { type: 'fetch' } });
       worker.on("message", msg => {
-        if (msg.type === 'error') {
+        if (typeof msg === 'object' && msg !== null && msg.type === 'error' && msg.message) {
           fileErrorLog(`[FetchWorker ${idx}]: ${msg.message}`);
         } else {
-          fileLog(`[FetchWorker ${idx}]: ${msg.message}`);
+          fileLog(`[FetchWorker ${idx}]: ${msg}`);
         }
       });
       worker.on("error", err => fileErrorLog(`[FetchWorker ${idx} Unhandled Error]: ${err.stack}`));

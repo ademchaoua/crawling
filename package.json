@@ -1,23 +1,23 @@
 {
-  "name": "cookpadscrapper",
+  "name": "crawling",
   "version": "1.0.0",
   "description": "",
-  "main": "main.js",
+  "main": "src/main.js",
   "scripts": {
-    "dev": "nodemon main.js",
-    "start": "node main.js",
+    "dev": "nodemon src/main.js",
+    "start": "node src/main.js",
     "test": "vitest"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ademchaoua/cookpadScrapper.git"
+    "url": "git+https://github.com/ademchaoua/crawling.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/ademchaoua/cookpadScrapper/issues"
+    "url": "https://github.com/ademchaoua/crawling/issues"
   },
-  "homepage": "https://github.com/ademchaoua/cookpadScrapper#readme",
+  "homepage": "https://github.com/ademchaoua/crawling#readme",
   "devDependencies": {
     "nodemon": "^3.1.10",
     "vitest": "^2.0.5"

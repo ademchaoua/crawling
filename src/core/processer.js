@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import crypto from "crypto";
 import { fetch } from 'undici';
 import { parentPort } from 'worker_threads';
+import { fileLog, fileErrorLog } from '../logger/index.js';
 
 export class PuppeteerRequiredError extends Error {
     constructor(message) { super(message); this.name = 'PuppeteerRequiredError'; }
@@ -35,26 +36,27 @@ export async function getHtmlPage(browser, url) {
         const html = await response.text();
 
         // Step 2: Check for signs of Cloudflare. If found, throw a specific error.
-        if (html.includes('Checking your browser') || html.includes('id="challenge-form"')) {
+        if (html.includes('Checking your browser') || html.includes('id="challenge-form"') || html.includes("Just a moment...")) {
             throw new PuppeteerRequiredError(`Puppeteer required for ${url}`);
         }
 
         // If no challenge, return the lightweight result
         return html;
     } catch (error) {
-        // If it's our specific error for Cloudflare, re-throw it to be caught by the worker.
-        if (error instanceof PuppeteerRequiredError) {
+        // If we don't have a browser instance, we can't proceed with Puppeteer.
+        // Re-throw the error so the fetch worker can handle it (e.g., by marking the job as 'requires_puppeteer').
+        if (!browser) {
             throw error;
         }
 
-        // If this is a fetch worker, it doesn't have a browser.
-        // We should throw the error so the worker can handle retries or failure.
-        if (!browser) {
-            throw error; // Re-throw the original fetch error
+        // If we are in a worker that HAS a browser, any fetch-related error should trigger a fallback to Puppeteer.
+        if (error instanceof PuppeteerRequiredError) {
+            parentPort?.postMessage(`[INFO] Puppeteer required for ${url}. Switching to Puppeteer.`);
+        } else {
+            parentPort?.postMessage(`[WARN] Initial fetch for ${url} failed, falling back to Puppeteer. Error: ${error.message}`);
         }
-
-        // Only if this is a puppeteer worker, fall back to puppeteer on generic fetch error.
-        parentPort?.postMessage(`[WARN] Initial fetch for ${url} failed, falling back to Puppeteer. Error: ${error.message}`);
+        
+        // Proceed with Puppeteer.
         return await getHtmlWithPuppeteer(browser, url);
     }
     // --- END: Hybrid Crawling Strategy ---
