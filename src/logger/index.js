@@ -1,6 +1,13 @@
 import fs from 'fs';
 import readline from 'readline';
 import { config } from '../../config/index.js';
+import path from 'path';
+
+const logDir = path.dirname(config.logging.logFile);
+
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+}
 
 const logStream = fs.createWriteStream(config.logging.logFile, { flags: 'a' });
 const errorLogStream = fs.createWriteStream(config.logging.errorLogFile, { flags: 'a' });
