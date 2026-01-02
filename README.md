@@ -8,8 +8,8 @@ _  /    __  ___/  __ `/_ | /| / /_  /_  _ \_  ___/
 / /___  _  /   / /_/ /__ |/ |/ /_  / /  __/  /    
 \____/  /_/    \__,_/ ____/|__/ /_/  \___//_/     
   </pre>
-  <h1>Hybrid Web Crawler</h1>
-  <p>A powerful and resource-efficient web crawler built with Node.js. It features a hybrid crawling strategy, an interactive CLI dashboard, and robust job management.</p>
+  <h1>Web Crawler</h1>
+  <p>A powerful and resource-efficient web crawler built with Node.js. It features an interactive CLI dashboard, and robust job management.</p>
 </div>
 
 <div align="center">
@@ -39,7 +39,6 @@ _  /    __  ___/  __ `/_ | /| / /_  /_  _ \_  ___/
 
 ## ✨ Key Features
 
-- **Hybrid Crawling Strategy**: Starts with a lightweight HTTP fetch and intelligently escalates to a full Puppeteer browser only when necessary (e.g., for sites protected by Cloudflare). This saves significant system resources.
 - **Multi-Threaded Performance**: Utilizes all available CPU cores with Node.js `worker_threads` to process multiple jobs in parallel.
 - **Interactive CLI Dashboard**: A real-time dashboard shows the status of the crawl queue (pending, processing, done, failed) and provides detailed statistics for each source.
 - **Dynamic Job Control**: Add new crawling jobs on the fly through the interactive command line.
@@ -53,7 +52,7 @@ _  /    __  ___/  __ `/_ | /| / /_  /_  _ \_  ___/
 ## 🛠️ Tech Stack
 
 - **Core**: Node.js, Worker Threads
-- **Crawling**: Undici (for lightweight fetching), Puppeteer (for heavy-duty, JS-rendered pages)
+- **Crawling**: Undici
 - **Data Extraction**: Cheerio
 - **Database**: MongoDB
 - **CLI**: Chalk, cli-table3
@@ -124,7 +123,7 @@ Once running, the interactive dashboard will appear.
 ├── src/
 │   ├── core/
 │   │   ├── processer.js  # HTML fetching, data/link extraction (Cheerio)
-│   │   └── worker.js     # Core crawling logic for both fetch and Puppeteer workers
+│   │   └── worker.js     # Core crawling logic for fetch workers
 │   ├── db/
 │   │   └── index.js      # MongoDB connection, collections, and queries
 │   ├── logger/
