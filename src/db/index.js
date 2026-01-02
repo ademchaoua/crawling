@@ -1,4 +1,3 @@
-// src/db/index.js
 import { MongoClient } from 'mongodb';
 import { config } from '../../config/index.js';
 

@@ -10,12 +10,12 @@ async function processUrl(browser, job) {
   const crawledDataCollection = await getCrawledDataCollection();
 
   try {
-    // تحديث حالة الرابط إلى "processing"
+    
     fileLog(`Processing URL: ${job.url}`);
 
     const html = await getHtmlPage(browser, job.url);
 
-    // --- START: New Link Extraction Logic ---
+    
     const baseUrl = new URL(job.url).origin;
     const newLinks = extractLinks(html, baseUrl);
 
@@ -28,8 +28,8 @@ async function processUrl(browser, job) {
               url: link, 
               status: 'pending', 
               added_at: new Date(), 
-              config: job.config, // Propagate config to new links
-              retryCount: 0 // Initialize retry count for new links
+              config: job.config, 
+              retryCount: 0 
             } 
           },
           upsert: true
@@ -38,20 +38,20 @@ async function processUrl(browser, job) {
       await queueCollection.bulkWrite(operations, { ordered: false });
       fileLog(`Found and queued ${operations.length} new links from ${job.url}`);
     }
-    // --- END: New Link Extraction Logic ---
+    
 
-    // يمكنك استخدام `htmlProcesser` أو أي دالة أخرى لاستخلاص البيانات
-    // هنا نستخدم دالة `htmlProcesser` من ملف `processor.js`
+    
+    
     if (!job.config || !job.config.cssPaths) {
       throw new Error(`Job for ${job.url} is missing configuration (cssPaths).`);
     }
 
-    // استخدام الإعدادات المرفقة مع المهمة
+    
     const article = await htmlProcesser(html, job.config.cssPaths);
 
     if (article && article.contents) {
-      // حفظ البيانات في `crawled_data`
-      // استخدام `updateOne` مع `upsert` يضمن عدم تكرار الرابط
+      
+      
       await crawledDataCollection.updateOne(
         { url: job.url },
         {
@@ -68,14 +68,14 @@ async function processUrl(browser, job) {
         { upsert: true }
       );
 
-      // تحديث حالة الرابط إلى "done"
+      
       await queueCollection.updateOne(
         { _id: job._id },
         { $set: { status: 'done' } }
       );
       fileLog(`Successfully crawled and saved: ${job.url}`);
     } else {
-      // إذا لم يتم العثور على محتوى، يتم تحديث الحالة إلى "failed"
+      
       await queueCollection.updateOne(
         { _id: job._id },
         { $set: { status: 'failed', error_message: 'No content extracted. CSS paths might be incorrect.' } }
@@ -87,31 +87,31 @@ async function processUrl(browser, job) {
     fileLog(`Error processing ${job.url} (Attempt ${currentRetries + 1}). Message: ${err.message}`);
     fileErrorLog(`Error processing ${job.url} (Attempt ${currentRetries + 1}). Stack: ${err.stack}`);
 
-    // الاقتراح: إعادة المحاولة للأخطاء المؤقتة
-    const isTemporaryError = err.message.includes('fetch failed'); // يمكنك إضافة المزيد من أنواع الأخطاء هنا
+    
+    const isTemporaryError = err.message.includes('fetch failed'); 
 
     if (err instanceof PuppeteerRequiredError) {
-      // إذا كانت الصفحة تتطلب Puppeteer، قم بتحديثها وإعادتها إلى قائمة الانتظار للعامل المخصص
+      
       await queueCollection.updateOne({ _id: job._id }, { $set: { status: 'pending', requires_puppeteer: true } });
       fileLog(`Marked ${job.url} as requiring Puppeteer.`);
       return;
     }
 
     if (isTemporaryError && currentRetries < config.crawler.maxRetries) {
-      // إعادة المحاولة: أعد الحالة إلى pending وزد العداد
+      
       await queueCollection.updateOne(
         { _id: job._id },
         { $set: { status: 'pending' }, $inc: { retryCount: 1 } }
       );
       fileLog(`Re-queuing ${job.url} for another attempt.`);
     } else {
-      // فشل دائم: حدث الحالة إلى failed
+      
       await queueCollection.updateOne(
         { _id: job._id },
         { $set: { status: 'failed', error_message: err.message, error_stack: err.stack } }
       );
 
-      // --- START: Bad Source Pruning Logic ---
+      
       if (config.crawler.pruning.enabled && job.config.sourceUrl) {
         const sourceUrl = job.config.sourceUrl;
         const failedCount = await queueCollection.countDocuments({ 'config.sourceUrl': sourceUrl, status: 'failed' });
@@ -128,7 +128,7 @@ async function processUrl(browser, job) {
           }
         }
       }
-      // --- END: Bad Source Pruning Logic ---
+      
     }
   }
 }
@@ -152,13 +152,13 @@ async function run() {
     const queueCollection = await getQueueCollection();
 
     while (true) {
-      // --- التحسين: استخدام findOneAndUpdate لسحب المهام بشكل آمن ---
+      
       const promises = Array.from({ length: config.crawler.concurrency }, async () => {
         let query;
-        // بناء الاستعلام الصحيح لكل نوع من العمال
+        
         if (workerType === 'puppeteer') {
           query = { status: 'pending', requires_puppeteer: true };
-        } else { // fetch worker
+        } else { 
           query = { status: 'pending', requires_puppeteer: { $ne: true } };
         }
 
@@ -169,14 +169,14 @@ async function run() {
 
         fileLog(`Worker type '${workerType}' checked for a job. Found: ${job ? job.url : 'None'}`);
         if (job) {
-          // عمال Fetch لا يمررون المتصفح
+          
           await processUrl(workerType === 'puppeteer' ? browser : null, job);
         }
       });
 
       await Promise.allSettled(promises);
 
-      // إذا لم يتم العثور على أي مهام، انتظر قليلاً
+      
       let countQuery;
       if (workerType === 'puppeteer') {
         countQuery = { status: 'pending', requires_puppeteer: true };
@@ -188,8 +188,8 @@ async function run() {
         fileLog(`No jobs found for type '${workerType}'. Sleeping...`);
         await sleep(config.crawler.sleep);
       }
-      // الاقتراح: أضف تأخيرًا بسيطًا بين كل دفعة من الطلبات لتقليل الضغط
-      await sleep(config.crawler.delay); // تأخير لمدة ثانية واحدة
+      
+      await sleep(config.crawler.delay); 
     }
   } finally {
     if (browser && browser.isConnected()) {

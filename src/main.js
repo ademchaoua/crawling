@@ -14,23 +14,19 @@ const numCores = os.cpus().length;
 
 const __filename = fileURLToPath(import.meta.url);
 
-/**
- * دالة لإضافة مصدر جديد إلى قاعدة البيانات وقائمة الانتظار.
- * @param {string} url - رابط الموقع.
- * @param {object} config - إعدادات الاستخلاص الخاصة بالرابط.
- */
+
 async function addNewSource(url, jobConfig) {
   const sourcesCollection = await getSourcesCollection();
   const queueCollection = await getQueueCollection();
   
-  // إضافة إلى جدول المصادر (لتتبع المصادر الرئيسية)
+  
   await sourcesCollection.updateOne(
     { url },
     { $setOnInsert: { url, category: jobConfig.category || 'general', created_at: new Date() } },
     { upsert: true }
   );
 
-  // إضافة إلى قائمة الانتظار مع الإعدادات الخاصة به
+  
   await queueCollection.updateOne(
     { url },
     { $setOnInsert: { url, status: 'pending', added_at: new Date(), config: { ...jobConfig, sourceUrl: url }, retryCount: 0 } },
@@ -40,7 +36,7 @@ async function addNewSource(url, jobConfig) {
 }
 
 function clearConsole() {
-  // ANSI escape code to clear the screen and move the cursor to the top-left
+  
   process.stdout.write('\x1B[2J\x1B[0;0H');
 }
 
@@ -116,11 +112,11 @@ async function main() {
   fileLog(`Main process started. Initializing ${numCores} workers.`);
 
   try {
-    // تشغيل متصفح واحد فقط في العملية الرئيسية
+    
     browser = await puppeteer.launch({ headless: true });
     const browserWSEndpoint = browser.wsEndpoint();
 
-    // --- الاقتراح: تشغيل عامل واحد لـ Puppeteer والبقية لـ Fetch ---
+    
     const workerURL = new URL(path.join('core', 'worker.js'), import.meta.url);
 
     const puppeteerWorker = new Worker(workerURL, { 
@@ -136,7 +132,7 @@ async function main() {
     puppeteerWorker.on("error", err => fileErrorLog(`[PuppeteerWorker Unhandled Error]: ${err.stack}`));
     puppeteerWorker.on("exit", code => code !== 0 && fileLog(`[WARN] PuppeteerWorker stopped with code ${code}`));
 
-    // تشغيل بقية العمال كعمال fetch
+    
     const fetchWorkerCount = Math.max(1, numCores - 1);
     Array.from({ length: fetchWorkerCount }, (_, idx) => {
       const worker = new Worker(workerURL, { workerData: { type: 'fetch' } });
@@ -154,13 +150,13 @@ async function main() {
   await connectToDatabase();
   consoleLog("Connected to MongoDB. Ready to add new URLs.");
 
-  // --- التحسين المقترح: إعادة جدولة المهام العالقة ---
+  
   const result = await requeueStuckJobs();
   if (result.modifiedCount > 0) {
     consoleLog(`[INFO] Re-queued ${result.modifiedCount} stuck jobs.`);
     fileLog(`Re-queued ${result.modifiedCount} jobs that were stuck in 'processing' state.`);
   }
-  // -----------------------------------------
+  
 
   fileLog("Successfully connected to MongoDB.");
   
@@ -204,14 +200,14 @@ async function main() {
   process.on('SIGINT', gracefulShutdown);
   process.on('SIGTERM', gracefulShutdown);
 
-  // Start the dashboard display loop
+  
   while (!isExiting) {
     await displayDashboard();
-    await new Promise(resolve => setTimeout(resolve, 5000)); // Update every 5 seconds
+    await new Promise(resolve => setTimeout(resolve, 5000)); 
   }
 
   } finally {
-    if (!isExiting) { // Avoid double-closing if shutdown is not graceful
+    if (!isExiting) { 
       if (browser) await browser.close();
       if (rl) rl.close();
       await closeDatabase();

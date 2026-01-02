@@ -23,9 +23,9 @@ async function getHtmlWithPuppeteer(browser, url) {
 }
 
 export async function getHtmlPage(browser, url) {
-    // --- START: Hybrid Crawling Strategy ---
+    
     try {
-        // Step 1: Try with a lightweight fetch first
+        
         const response = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -35,31 +35,31 @@ export async function getHtmlPage(browser, url) {
         });
         const html = await response.text();
 
-        // Step 2: Check for signs of Cloudflare. If found, throw a specific error.
+        
         if (html.includes('Checking your browser') || html.includes('id="challenge-form"') || html.includes("Just a moment...")) {
             throw new PuppeteerRequiredError(`Puppeteer required for ${url}`);
         }
 
-        // If no challenge, return the lightweight result
+        
         return html;
     } catch (error) {
-        // If we don't have a browser instance, we can't proceed with Puppeteer.
-        // Re-throw the error so the fetch worker can handle it (e.g., by marking the job as 'requires_puppeteer').
+        
+        
         if (!browser) {
             throw error;
         }
 
-        // If we are in a worker that HAS a browser, any fetch-related error should trigger a fallback to Puppeteer.
+        
         if (error instanceof PuppeteerRequiredError) {
             parentPort?.postMessage(`[INFO] Puppeteer required for ${url}. Switching to Puppeteer.`);
         } else {
             parentPort?.postMessage(`[WARN] Initial fetch for ${url} failed, falling back to Puppeteer. Error: ${error.message}`);
         }
         
-        // Proceed with Puppeteer.
+        
         return await getHtmlWithPuppeteer(browser, url);
     }
-    // --- END: Hybrid Crawling Strategy ---
+    
 }
 
 export function generateId(text) {
@@ -68,15 +68,15 @@ export function generateId(text) {
 
 export function extractLinks(html, baseUrl) {
     const $ = cheerio.load(html);
-    const links = new Set(); // Use a Set to avoid duplicates from the same page
+    const links = new Set(); 
     const ignoreExtensions = [
-      // images
+      
       '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico',
-      // video/audio
+      
       '.mp4', '.webm', 'avi', '.mov', '.mkv', '.mp3', '.wav', '.ogg',
-      // documents
+      
       '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip', '.rar',
-      // code/styles
+      
       '.css', '.js'
     ];
   
@@ -87,20 +87,20 @@ export function extractLinks(html, baseUrl) {
       try {
         const absoluteUrl = new URL(href, baseUrl);
         
-        // 1. Check if it belongs to the same origin
+        
         if (absoluteUrl.origin !== baseUrl) {
           return;
         }
   
-        // 2. Filter out media/script files
+        
         if (ignoreExtensions.some(ext => absoluteUrl.pathname.toLowerCase().endsWith(ext))) {
           return;
         }
   
-        // 3. Add the cleaned URL (without fragment)
+        
         links.add(absoluteUrl.origin + absoluteUrl.pathname);
       } catch (e) {
-        // Ignore invalid URLs
+        
       }
     });
   
@@ -138,7 +138,7 @@ export async function htmlProcesser(html, paths) {
                     result += src + " ";
                 }
             } else {
-                // الاقتراح: تجاهل محتوى figcaption لمنع إضافة اسم ناشر الصورة
+                
                 if (node.name !== 'figcaption') {
                     $(node).contents().each((i, child) => traverse(child));
                 }
@@ -152,7 +152,7 @@ export async function htmlProcesser(html, paths) {
 
     for (const path of paths) {
         const root = $(path);
-        // التحسين: قم بإزالة العناصر غير المرغوب فيها من داخل العنصر المستهدف فقط
+        
         root.find("script, style, noscript, iframe, form, header, footer, aside").remove();
         root.contents().each((i, el) => traverse(el));
     }
@@ -163,12 +163,12 @@ export async function htmlProcesser(html, paths) {
     const lang = $("html").attr("lang");
     if (!lang?.startsWith("en")) throw new Error("Not an English article");
 
-    // --- START: Extract More Data ---
+    
     const description = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content') || null;
     const image = $('meta[property="og:image"]').attr('content') || null;
     const author = $('meta[name="author"]').attr('content') || null;
     const publishedDate = $('meta[property="article:published_time"]').attr('content') || $('time').attr('datetime') || null;
-    // --- END: Extract More Data ---
+    
 
     const article = {
         contents: result.trim(),

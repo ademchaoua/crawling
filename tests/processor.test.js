@@ -1,4 +1,3 @@
-// tests/processor.test.js
 import { describe, it, expect } from 'vitest';
 import { extractLinks } from '../src/core/processer.js';
 
