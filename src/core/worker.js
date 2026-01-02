@@ -1,11 +1,10 @@
 import { workerData } from "worker_threads";
-import { htmlProcesser, getHtmlPage, extractLinks, PuppeteerRequiredError } from "./processer.js";
-import puppeteer from 'puppeteer';
+import { htmlProcesser, getHtmlPage, extractLinks } from "./processer.js";
 import { config } from '../../config/index.js';
 import { connectToDatabase, getQueueCollection, getCrawledDataCollection, closeDatabase } from '../db/index.js';
 import { fileLog, fileErrorLog } from '../logger/index.js';
 
-async function processUrl(browser, job) {
+async function processUrl(job) {
   const queueCollection = await getQueueCollection();
   const crawledDataCollection = await getCrawledDataCollection();
 
@@ -13,7 +12,7 @@ async function processUrl(browser, job) {
     
     fileLog(`Processing URL: ${job.url}`);
 
-    const html = await getHtmlPage(browser, job.url);
+    const html = await getHtmlPage(job.url);
 
     
     const baseUrl = new URL(job.url).origin;
@@ -90,13 +89,6 @@ async function processUrl(browser, job) {
     
     const isTemporaryError = err.message.includes('fetch failed'); 
 
-    if (err instanceof PuppeteerRequiredError) {
-      
-      await queueCollection.updateOne({ _id: job._id }, { $set: { status: 'pending', requires_puppeteer: true } });
-      fileLog(`Marked ${job.url} as requiring Puppeteer.`);
-      return;
-    }
-
     if (isTemporaryError && currentRetries < config.crawler.maxRetries) {
       
       await queueCollection.updateOne(
@@ -138,65 +130,44 @@ function sleep(ms) {
 }
 
 async function run() {
-  let browser = null;
-
   try {
     await connectToDatabase();
     
-    const workerType = workerData.type;
-
-    if (workerType === 'puppeteer') {
-      browser = await puppeteer.connect({ browserWSEndpoint: workerData.browserWSEndpoint });
-    }
-
     const queueCollection = await getQueueCollection();
 
     while (true) {
       
       const promises = Array.from({ length: config.crawler.concurrency }, async () => {
-        let query;
-        
-        if (workerType === 'puppeteer') {
-          query = { status: 'pending', requires_puppeteer: true };
-        } else { 
-          query = { status: 'pending', requires_puppeteer: { $ne: true } };
-        }
+        let query = { status: 'pending' };
 
         const job = await queueCollection.findOneAndUpdate(query,
           { $set: { status: 'processing' } },
           { returnDocument: 'after' }
         );
 
-        fileLog(`Worker type '${workerType}' checked for a job. Found: ${job ? job.url : 'None'}`);
+        fileLog(`Worker checked for a job. Found: ${job ? job.url : 'None'}`);
         if (job) {
           
-          await processUrl(workerType === 'puppeteer' ? browser : null, job);
+          await processUrl(job);
         }
       });
 
       await Promise.allSettled(promises);
 
       
-      let countQuery;
-      if (workerType === 'puppeteer') {
-        countQuery = { status: 'pending', requires_puppeteer: true };
-      } else {
-        countQuery = { status: 'pending', requires_puppeteer: { $ne: true } };
-      }
+      let countQuery = { status: 'pending' };
       const pendingCount = await queueCollection.countDocuments(countQuery);
       if (pendingCount === 0) {
-        fileLog(`No jobs found for type '${workerType}'. Sleeping...`);
+        fileLog(`No jobs found. Sleeping...`);
         await sleep(config.crawler.sleep);
       }
       
       await sleep(config.crawler.delay); 
     }
   } finally {
-    if (browser && browser.isConnected()) {
-      await browser.disconnect();
-    }
     await closeDatabase();
   }
 }
 
 run();
+

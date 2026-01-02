@@ -4,62 +4,16 @@ import { fetch } from 'undici';
 import { parentPort } from 'worker_threads';
 import { fileLog, fileErrorLog } from '../logger/index.js';
 
-export class PuppeteerRequiredError extends Error {
-    constructor(message) { super(message); this.name = 'PuppeteerRequiredError'; }
-}
-
-async function getHtmlWithPuppeteer(browser, url) {
-    let page = null;
-    try {
-        page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-        return await page.content();
-    } finally {
-        if (page) {
-            await page.close();
+async function getHtmlPage(url) {
+    const response = await fetch(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
         }
-    }
-}
-
-export async function getHtmlPage(browser, url) {
-    
-    try {
-        
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-            }
-        });
-        const html = await response.text();
-
-        
-        if (html.includes('Checking your browser') || html.includes('id="challenge-form"') || html.includes("Just a moment...")) {
-            throw new PuppeteerRequiredError(`Puppeteer required for ${url}`);
-        }
-
-        
-        return html;
-    } catch (error) {
-        
-        
-        if (!browser) {
-            throw error;
-        }
-
-        
-        if (error instanceof PuppeteerRequiredError) {
-            parentPort?.postMessage(`[INFO] Puppeteer required for ${url}. Switching to Puppeteer.`);
-        } else {
-            parentPort?.postMessage(`[WARN] Initial fetch for ${url} failed, falling back to Puppeteer. Error: ${error.message}`);
-        }
-        
-        
-        return await getHtmlWithPuppeteer(browser, url);
-    }
-    
+    });
+    const html = await response.text();
+    return html;
 }
 
 export function generateId(text) {

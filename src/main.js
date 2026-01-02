@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import readline from 'readline';
 import c from 'chalk';
 import Table from 'cli-table3';
-import puppeteer from 'puppeteer';
 import { fileLog, fileErrorLog, consoleLog, setReadline } from './logger/index.js';
 import { connectToDatabase, getSourcesCollection, getQueueCollection, closeDatabase, requeueStuckJobs } from './db/index.js';
 
@@ -104,7 +103,6 @@ async function displayDashboard() {
 }
 
 async function main() {
-  let browser = null;
   let isExiting = false;
   let rl = null;
 
@@ -113,38 +111,19 @@ async function main() {
 
   try {
     
-    browser = await puppeteer.launch({ headless: true });
-    const browserWSEndpoint = browser.wsEndpoint();
-
-    
     const workerURL = new URL(path.join('core', 'worker.js'), import.meta.url);
-
-    const puppeteerWorker = new Worker(workerURL, { 
-      workerData: { type: 'puppeteer', browserWSEndpoint } 
-    });
-    puppeteerWorker.on("message", msg => {
-      if (typeof msg === 'object' && msg !== null && msg.type === 'error' && msg.message) {
-        fileErrorLog(`[PuppeteerWorker]: ${msg.message}`);
-      } else {
-        fileLog(`[PuppeteerWorker]: ${msg}`);
-      }
-    });
-    puppeteerWorker.on("error", err => fileErrorLog(`[PuppeteerWorker Unhandled Error]: ${err.stack}`));
-    puppeteerWorker.on("exit", code => code !== 0 && fileLog(`[WARN] PuppeteerWorker stopped with code ${code}`));
-
     
-    const fetchWorkerCount = Math.max(1, numCores - 1);
-    Array.from({ length: fetchWorkerCount }, (_, idx) => {
-      const worker = new Worker(workerURL, { workerData: { type: 'fetch' } });
+    Array.from({ length: numCores }, (_, idx) => {
+      const worker = new Worker(workerURL);
       worker.on("message", msg => {
         if (typeof msg === 'object' && msg !== null && msg.type === 'error' && msg.message) {
-          fileErrorLog(`[FetchWorker ${idx}]: ${msg.message}`);
+          fileErrorLog(`[Worker ${idx}]: ${msg.message}`);
         } else {
-          fileLog(`[FetchWorker ${idx}]: ${msg}`);
+          fileLog(`[Worker ${idx}]: ${msg}`);
         }
       });
-      worker.on("error", err => fileErrorLog(`[FetchWorker ${idx} Unhandled Error]: ${err.stack}`));
-      worker.on("exit", code => code !== 0 && fileLog(`[WARN] FetchWorker ${idx} stopped with code ${code}`));
+      worker.on("error", err => fileErrorLog(`[Worker ${idx} Unhandled Error]: ${err.stack}`));
+      worker.on("exit", code => code !== 0 && fileLog(`[WARN] Worker ${idx} stopped with code ${code}`));
     });
 
   await connectToDatabase();
@@ -188,9 +167,6 @@ async function main() {
     isExiting = true;
     consoleLog("\nGracefully shutting down... please wait.");
     fileLog("Shutdown signal received. Closing resources.");
-    if (browser) {
-      await browser.close();
-    }
     await closeDatabase();
     consoleLog("Exited gracefully.");
     rl.close();
@@ -208,7 +184,6 @@ async function main() {
 
   } finally {
     if (!isExiting) { 
-      if (browser) await browser.close();
       if (rl) rl.close();
       await closeDatabase();
       consoleLog("Exiting main process.");
@@ -218,3 +193,4 @@ async function main() {
 }
 
 main();
+
